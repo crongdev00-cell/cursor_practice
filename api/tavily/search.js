@@ -1,4 +1,5 @@
 const { searchTavily } = require('../../lib/tavily');
+const { getTavilyApiKey } = require('../../lib/env');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
@@ -6,7 +7,7 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const apiKey = process.env.TAVILY_API_KEY;
+  const apiKey = getTavilyApiKey();
 
   let body = req.body;
   if (typeof body === 'string') {

@@ -1,6 +1,10 @@
 {
   "version": 2,
-  "name": "defense-dashboard",
+  "functions": {
+    "api/**/*.js": {
+      "includeFiles": "lib/**"
+    }
+  },
   "headers": [
     {
       "source": "/api/(.*)",
