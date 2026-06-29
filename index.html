@@ -183,45 +183,91 @@
             </table>
           </div>
         </article>
+      </section>
 
-        <article class="news-card">
-          <div class="card-header">
+      <!-- Dual News Search -->
+      <section class="news-dual-section" id="newsSection">
+        <div class="news-dual-header">
+          <div>
             <h2>방산 뉴스 검색</h2>
-            <span class="card-tag live" id="newsStatusTag">TAVILY</span>
+            <p class="news-dual-subtitle">국외 · 국내 뉴스를 동시에 검색합니다</p>
           </div>
-          <div class="news-search">
-            <form id="newsSearchForm" class="news-search-form">
-              <input
-                type="search"
-                id="newsSearchInput"
-                class="news-search-input"
-                placeholder="키워드 검색 (예: K2 전차 수출, NATO 방산)"
-                autocomplete="off"
-              />
-              <button type="submit" id="newsSearchBtn" class="news-search-btn" title="검색">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-                </svg>
-              </button>
-            </form>
-            <div class="news-chips" id="newsChips">
-              <button type="button" class="news-chip active" data-query="defense industry news latest">최신 뉴스</button>
-              <button type="button" class="news-chip" data-query="Korea defense export news">한국 방산</button>
-              <button type="button" class="news-chip" data-query="NATO defense spending contract">NATO</button>
-              <button type="button" class="news-chip" data-query="military drone UAV news">무인기</button>
-              <button type="button" class="news-chip" data-query="defense contract award">수출·계약</button>
+        </div>
+
+        <form id="newsGlobalForm" class="news-global-search">
+          <input
+            type="search"
+            id="newsGlobalInput"
+            class="news-search-input"
+            placeholder="검색어 입력 (예: K2 전차, NATO 방산, 드론)"
+            autocomplete="off"
+          />
+          <button type="submit" id="newsGlobalBtn" class="news-global-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            통합 검색
+          </button>
+        </form>
+
+        <div class="news-dual-grid">
+          <!-- Tavily: Global -->
+          <article class="news-panel news-panel--global">
+            <div class="news-panel-header">
+              <div class="news-panel-title">
+                <span class="news-panel-icon">🌍</span>
+                <div>
+                  <h3>국외 뉴스</h3>
+                  <span class="news-panel-provider">Tavily</span>
+                </div>
+              </div>
+              <span class="card-tag live" id="tavilyStatusTag">—</span>
             </div>
-          </div>
-          <div id="newsLoading" class="news-state hidden">
-            <div class="news-spinner"></div>
-            <span>Tavily에서 뉴스 검색 중…</span>
-          </div>
-          <div id="newsError" class="news-state news-error hidden">
-            <span id="newsErrorMsg">검색에 실패했습니다.</span>
-            <button type="button" id="newsRetryBtn" class="news-retry-btn">다시 시도</button>
-          </div>
-          <ul class="news-list" id="newsList"></ul>
-        </article>
+            <div class="news-chips" id="tavilyChips">
+              <button type="button" class="news-chip active" data-target="tavily" data-query="defense industry news latest">최신</button>
+              <button type="button" class="news-chip" data-target="tavily" data-query="NATO defense spending">NATO</button>
+              <button type="button" class="news-chip" data-target="tavily" data-query="military drone UAV news">무인기</button>
+              <button type="button" class="news-chip" data-target="tavily" data-query="Korea defense export">Korea export</button>
+            </div>
+            <div id="tavilyLoading" class="news-state hidden">
+              <div class="news-spinner"></div><span>국외 뉴스 검색 중…</span>
+            </div>
+            <div id="tavilyError" class="news-state news-error hidden">
+              <span id="tavilyErrorMsg"></span>
+              <button type="button" class="news-retry-btn" data-retry="tavily">다시 시도</button>
+            </div>
+            <ul class="news-list" id="tavilyList"></ul>
+          </article>
+
+          <!-- Naver: Domestic -->
+          <article class="news-panel news-panel--domestic">
+            <div class="news-panel-header">
+              <div class="news-panel-title">
+                <span class="news-panel-icon">🇰🇷</span>
+                <div>
+                  <h3>국내 뉴스</h3>
+                  <span class="news-panel-provider">Naver Search</span>
+                </div>
+              </div>
+              <span class="card-tag" id="naverStatusTag">—</span>
+            </div>
+            <div class="news-chips" id="naverChips">
+              <button type="button" class="news-chip active" data-target="naver" data-query="방산">방산</button>
+              <button type="button" class="news-chip" data-target="naver" data-query="K2 전차">K2 전차</button>
+              <button type="button" class="news-chip" data-target="naver" data-query="방위산업">방위산업</button>
+              <button type="button" class="news-chip" data-target="naver" data-query="LIG넥스원">LIG넥스원</button>
+              <button type="button" class="news-chip" data-target="naver" data-query="국방 R&D">국방 R&D</button>
+            </div>
+            <div id="naverLoading" class="news-state hidden">
+              <div class="news-spinner news-spinner--naver"></div><span>국내 뉴스 검색 중…</span>
+            </div>
+            <div id="naverError" class="news-state news-error hidden">
+              <span id="naverErrorMsg"></span>
+              <button type="button" class="news-retry-btn news-retry-btn--naver" data-retry="naver">다시 시도</button>
+            </div>
+            <ul class="news-list" id="naverList"></ul>
+          </article>
+        </div>
       </section>
 
       <section class="tech-trends">

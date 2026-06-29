@@ -1,4 +1,4 @@
-const { getTavilyApiKey } = require('../../lib/env');
+const { getTavilyApiKey, getNaverCredentials } = require('../../lib/env');
 
 module.exports = (req, res) => {
   if (req.method !== 'GET') {
@@ -6,12 +6,13 @@ module.exports = (req, res) => {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const key = getTavilyApiKey();
+  const tavilyKey = getTavilyApiKey();
+  const naver = getNaverCredentials();
 
   return res.status(200).json({
     status: 'ok',
-    tavilyConfigured: Boolean(key),
-    keyLength: key ? key.length : 0,
+    tavilyConfigured: Boolean(tavilyKey),
+    naverConfigured: Boolean(naver),
     runtime: 'vercel',
     vercelEnv: process.env.VERCEL_ENV || null,
   });

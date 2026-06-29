@@ -35,24 +35,21 @@ const companies = [
   { rank: 10, name: 'Leonardo', country: '🇮🇹 이탈리아', revenue: '$15.2B', change: '+11.3%', field: '헬기·전자', up: true },
 ];
 
-const newsItems = [
-  { category: 'export', catLabel: '수출', title: '폴란드, K2 전차 추가 180대 도입 계약 체결 — 한화에어로스페이스', date: '2026.06.25', source: 'Defense News', url: '#' },
-  { category: 'tech', catLabel: '기술', title: 'NATO, AI 기반 다국적 연합 작전 시스템(NATO AI C2) 파일럿 가동', date: '2026.06.22', source: 'NATO Press', url: '#' },
-  { category: 'contract', catLabel: '계약', title: '미 해군, 차세대 무인 수중정(UUV) 개발 42억 달러 계약 — General Dynamics', date: '2026.06.18', source: 'USNI News', url: '#' },
-  { category: 'policy', catLabel: '정책', title: 'EU, 2027년까지 방위 R&D 예산 30% 증액 결의 — REARM Europe Initiative', date: '2026.06.15', source: 'European Commission', url: '#' },
-  { category: 'export', catLabel: '수출', title: 'LIG넥스원, 중동국 K-SAM Block-II 추가 수출 MOU 체결', date: '2026.06.12', source: 'KOTRA', url: '#' },
-  { category: 'tech', catLabel: '기술', title: '하이퍼소닉 방어체계(HMDS) 글로벌 시장, 2030년 150억 달러 전망', date: '2026.06.08', source: 'SIPRI Report', url: '#' },
-];
+const DEFAULT_TAVILY_QUERY = 'defense industry news latest';
+const DEFAULT_NAVER_QUERY = '방산';
 
-const DEFAULT_NEWS_QUERY = 'defense industry news latest';
-let currentNewsQuery = DEFAULT_NEWS_QUERY;
-let tavilyAvailable = false;
+const newsState = {
+  tavilyAvailable: false,
+  naverAvailable: false,
+  tavilyQuery: DEFAULT_TAVILY_QUERY,
+  naverQuery: DEFAULT_NAVER_QUERY,
+};
 
-function getTavilyAPI() {
-  if (!window.TavilyAPI) {
-    throw new Error('js/api.js 를 불러오지 못했습니다. 페이지를 새로고침(Ctrl+F5)하세요.');
+function getDashboardAPI() {
+  if (!window.DashboardAPI) {
+    throw new Error('js/api.js 를 불러오지 못했습니다. Ctrl+F5 로 새로고침하세요.');
   }
-  return window.TavilyAPI;
+  return window.DashboardAPI;
 }
 
 const techTrends = [
@@ -128,15 +125,45 @@ function mapTavilyResults(results) {
       snippet: r.content || '',
       source: extractSource(r.url),
       url: r.url,
-      score: r.score,
     };
   });
 }
 
-function renderNewsItems(items) {
-  const list = document.getElementById('newsList');
+function mapNaverResults(items) {
+  return items.map((item) => {
+    const { category, catLabel } = inferCategory(item.title || '', item.description || '');
+    const url = item.originallink || item.link || '#';
+    let source = 'Naver';
+    try {
+      source = new URL(url).hostname.replace(/^www\./, '');
+    } catch { /* ignore */ }
+
+    return {
+      category,
+      catLabel,
+      title: item.title || '제목 없음',
+      snippet: item.description || '',
+      source,
+      date: item.pubDate ? formatPubDate(item.pubDate) : '',
+      url,
+    };
+  });
+}
+
+function formatPubDate(dateStr) {
+  try {
+    return new Date(dateStr).toLocaleDateString('ko-KR', {
+      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
+function renderNewsList(listId, items, emptyMsg = '검색 결과가 없습니다.') {
+  const list = document.getElementById(listId);
   if (!items.length) {
-    list.innerHTML = '<li class="news-state">검색 결과가 없습니다.</li>';
+    list.innerHTML = `<li class="news-state">${emptyMsg}</li>`;
     return;
   }
 
@@ -145,7 +172,7 @@ function renderNewsItems(items) {
       <a href="${sanitizeUrl(n.url)}" target="_blank" rel="noopener noreferrer">
         <div class="news-meta">
           <span class="news-category cat-${n.category}">${escapeHtml(n.catLabel)}</span>
-          <span class="news-date">${escapeHtml(n.source)}</span>
+          <span class="news-date">${escapeHtml(n.date || n.source)}</span>
         </div>
         <div class="news-title">${escapeHtml(n.title)}</div>
         ${n.snippet ? `<div class="news-snippet">${escapeHtml(n.snippet)}</div>` : ''}
@@ -154,92 +181,110 @@ function renderNewsItems(items) {
   `).join('');
 }
 
-function renderFallbackNews() {
-  renderNewsItems(newsItems.map((n) => ({ ...n, snippet: '' })));
+function setPanelLoading(panel, loading) {
+  document.getElementById(`${panel}Loading`).classList.toggle('hidden', !loading);
 }
 
-function setNewsLoading(loading) {
-  document.getElementById('newsLoading').classList.toggle('hidden', !loading);
-  document.getElementById('newsSearchBtn').disabled = loading;
+function showPanelError(panel, message) {
+  document.getElementById(`${panel}Error`).classList.remove('hidden');
+  document.getElementById(`${panel}ErrorMsg`).textContent = message;
 }
 
-function showNewsError(message, clearList = true) {
-  document.getElementById('newsError').classList.remove('hidden');
-  document.getElementById('newsErrorMsg').textContent = message;
-  if (clearList) document.getElementById('newsList').innerHTML = '';
+function hidePanelError(panel) {
+  document.getElementById(`${panel}Error`).classList.add('hidden');
 }
 
-function hideNewsError() {
-  document.getElementById('newsError').classList.add('hidden');
-}
-
-function setActiveChip(query) {
-  document.querySelectorAll('.news-chip').forEach((chip) => {
-    chip.classList.toggle('active', chip.dataset.query === query);
-  });
-}
-
-function updateNewsStatusTag(configured, live) {
-  const tag = document.getElementById('newsStatusTag');
+function updatePanelStatus(panel, configured, live) {
+  const tag = document.getElementById(`${panel}StatusTag`);
   if (!configured) {
     tag.textContent = 'OFFLINE';
     tag.classList.remove('live');
     return;
   }
-  tag.textContent = live ? 'LIVE' : 'TAVILY';
+  tag.textContent = live ? 'LIVE' : 'READY';
   tag.classList.add('live');
 }
 
-async function searchNews(query) {
-  currentNewsQuery = query;
-  hideNewsError();
-  setNewsLoading(true);
+function setActiveChip(panel, query) {
+  document.querySelectorAll(`.news-chip[data-target="${panel}"]`).forEach((chip) => {
+    chip.classList.toggle('active', chip.dataset.query === query);
+  });
+}
 
-  const input = document.getElementById('newsSearchInput');
-  if (input.value.trim() !== query) {
-    input.value = query;
-  }
+async function searchTavilyNews(query) {
+  newsState.tavilyQuery = query;
+  hidePanelError('tavily');
+  setPanelLoading('tavily', true);
 
   try {
-    const data = await getTavilyAPI().search(query, {
+    const data = await getDashboardAPI().searchTavily(query, {
       max_results: 8,
       topic: 'news',
       search_depth: 'basic',
     });
-
-    const items = mapTavilyResults(data.results || []);
-    renderNewsItems(items);
-    updateNewsStatusTag(true, true);
+    renderNewsList('tavilyList', mapTavilyResults(data.results || []));
+    updatePanelStatus('tavily', true, true);
+    setActiveChip('tavily', query);
   } catch (err) {
-    showNewsError(err.message || '뉴스 검색에 실패했습니다.');
-    updateNewsStatusTag(tavilyAvailable, false);
+    renderNewsList('tavilyList', []);
+    showPanelError('tavily', err.message || '국외 뉴스 검색 실패');
+    updatePanelStatus('tavily', newsState.tavilyAvailable, false);
   } finally {
-    setNewsLoading(false);
+    setPanelLoading('tavily', false);
   }
 }
 
-function setupNewsSearch() {
-  const form = document.getElementById('newsSearchForm');
-  const input = document.getElementById('newsSearchInput');
+async function searchNaverNews(query) {
+  newsState.naverQuery = query;
+  hidePanelError('naver');
+  setPanelLoading('naver', true);
 
-  form.addEventListener('submit', (e) => {
+  try {
+    const data = await getDashboardAPI().searchNaver(query, {
+      display: 8,
+      sort: 'date',
+    });
+    renderNewsList('naverList', mapNaverResults(data.items || []));
+    updatePanelStatus('naver', true, true);
+    setActiveChip('naver', query);
+  } catch (err) {
+    renderNewsList('naverList', []);
+    showPanelError('naver', err.message || '국내 뉴스 검색 실패');
+    updatePanelStatus('naver', newsState.naverAvailable, false);
+  } finally {
+    setPanelLoading('naver', false);
+  }
+}
+
+async function searchAllNews(query) {
+  const input = document.getElementById('newsGlobalInput');
+  if (input.value.trim() !== query) input.value = query;
+  await Promise.all([searchTavilyNews(query), searchNaverNews(query)]);
+}
+
+function setupNewsSearch() {
+  document.getElementById('newsGlobalForm').addEventListener('submit', (e) => {
     e.preventDefault();
-    const query = input.value.trim();
+    const query = document.getElementById('newsGlobalInput').value.trim();
     if (!query) return;
-    setActiveChip('');
-    searchNews(query);
+    searchAllNews(query);
   });
 
   document.querySelectorAll('.news-chip').forEach((chip) => {
     chip.addEventListener('click', () => {
+      const target = chip.dataset.target;
       const query = chip.dataset.query;
-      setActiveChip(query);
-      searchNews(query);
+      if (target === 'tavily') searchTavilyNews(query);
+      if (target === 'naver') searchNaverNews(query);
     });
   });
 
-  document.getElementById('newsRetryBtn').addEventListener('click', () => {
-    searchNews(currentNewsQuery);
+  document.querySelectorAll('[data-retry]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const panel = btn.dataset.retry;
+      if (panel === 'tavily') searchTavilyNews(newsState.tavilyQuery);
+      if (panel === 'naver') searchNaverNews(newsState.naverQuery);
+    });
   });
 }
 
@@ -247,22 +292,31 @@ async function initNews() {
   setupNewsSearch();
 
   try {
-    const health = await getTavilyAPI().health();
-    tavilyAvailable = health.tavilyConfigured;
-    updateNewsStatusTag(tavilyAvailable, false);
+    const health = await getDashboardAPI().health();
+    newsState.tavilyAvailable = health.tavilyConfigured;
+    newsState.naverAvailable = health.naverConfigured;
 
-    if (tavilyAvailable) {
-      setActiveChip(DEFAULT_NEWS_QUERY);
-      await searchNews(DEFAULT_NEWS_QUERY);
+    updatePanelStatus('tavily', newsState.tavilyAvailable, false);
+    updatePanelStatus('naver', newsState.naverAvailable, false);
+
+    const tasks = [];
+
+    if (newsState.tavilyAvailable) {
+      tasks.push(searchTavilyNews(DEFAULT_TAVILY_QUERY));
     } else {
-      renderFallbackNews();
-      showNewsError('TAVILY_API_KEY 미설정 — .env 파일을 확인하세요. (샘플 데이터 표시 중)', false);
+      showPanelError('tavily', 'TAVILY_API_KEY 미설정 — .env 또는 Vercel 환경 변수를 확인하세요.');
     }
+
+    if (newsState.naverAvailable) {
+      tasks.push(searchNaverNews(DEFAULT_NAVER_QUERY));
+    } else {
+      showPanelError('naver', 'NAVER_CLIENT_ID / NAVER_CLIENT_SECRET 미설정 — .env 또는 Vercel 환경 변수를 확인하세요.');
+    }
+
+    if (tasks.length) await Promise.all(tasks);
   } catch (err) {
-    tavilyAvailable = false;
-    renderFallbackNews();
-    showNewsError(err.message || 'API 서버에 연결할 수 없습니다.', false);
-    updateNewsStatusTag(false, false);
+    showPanelError('tavily', err.message || 'API 서버 연결 실패');
+    showPanelError('naver', err.message || 'API 서버 연결 실패');
   }
 }
 
@@ -512,7 +566,7 @@ function setupNav() {
         overview: '.kpi-grid',
         market: '.chart-grid',
         tech: '.tech-trends',
-        news: '.bottom-grid',
+        news: '#newsSection',
       };
       const el = document.querySelector(targets[section]);
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -525,9 +579,10 @@ function setupRefresh() {
     const btn = document.getElementById('refreshBtn');
     btn.classList.add('spinning');
     setCurrentDate();
-    if (tavilyAvailable) {
-      await searchNews(currentNewsQuery);
-    }
+    await Promise.all([
+      newsState.tavilyAvailable ? searchTavilyNews(newsState.tavilyQuery) : Promise.resolve(),
+      newsState.naverAvailable ? searchNaverNews(newsState.naverQuery) : Promise.resolve(),
+    ]);
     setTimeout(() => btn.classList.remove('spinning'), 800);
   });
 }
