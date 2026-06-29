@@ -41,8 +41,13 @@ const DEFAULT_NAVER_QUERY = '방산';
 const newsState = {
   tavilyAvailable: false,
   naverAvailable: false,
+  geminiAvailable: false,
+  geminiHint: '',
+  geminiLegacyServer: false,
   tavilyQuery: DEFAULT_TAVILY_QUERY,
   naverQuery: DEFAULT_NAVER_QUERY,
+  tavilyResults: [],
+  naverResults: [],
 };
 
 function getDashboardAPI() {
@@ -222,13 +227,18 @@ async function searchTavilyNews(query) {
       topic: 'news',
       search_depth: 'basic',
     });
-    renderNewsList('tavilyList', mapTavilyResults(data.results || []));
+    const mapped = mapTavilyResults(data.results || []);
+    newsState.tavilyResults = mapped;
+    renderNewsList('tavilyList', mapped);
     updatePanelStatus('tavily', true, true);
     setActiveChip('tavily', query);
+    updateAnalysisMeta();
   } catch (err) {
+    newsState.tavilyResults = [];
     renderNewsList('tavilyList', []);
     showPanelError('tavily', err.message || '국외 뉴스 검색 실패');
     updatePanelStatus('tavily', newsState.tavilyAvailable, false);
+    updateAnalysisMeta();
   } finally {
     setPanelLoading('tavily', false);
   }
@@ -244,13 +254,18 @@ async function searchNaverNews(query) {
       display: 8,
       sort: 'date',
     });
-    renderNewsList('naverList', mapNaverResults(data.items || []));
+    const mapped = mapNaverResults(data.items || []);
+    newsState.naverResults = mapped;
+    renderNewsList('naverList', mapped);
     updatePanelStatus('naver', true, true);
     setActiveChip('naver', query);
+    updateAnalysisMeta();
   } catch (err) {
+    newsState.naverResults = [];
     renderNewsList('naverList', []);
     showPanelError('naver', err.message || '국내 뉴스 검색 실패');
     updatePanelStatus('naver', newsState.naverAvailable, false);
+    updateAnalysisMeta();
   } finally {
     setPanelLoading('naver', false);
   }
@@ -288,16 +303,31 @@ function setupNewsSearch() {
   });
 }
 
+async function refreshApiHealth() {
+  try {
+    const health = await getDashboardAPI().health();
+    newsState.tavilyAvailable = Boolean(health.tavilyConfigured);
+    newsState.naverAvailable = Boolean(health.naverConfigured);
+    newsState.geminiLegacyServer = health.serverVersion !== 2 && health.geminiConfigured === undefined;
+    newsState.geminiAvailable = Boolean(health.geminiConfigured);
+    newsState.geminiHint = health.geminiHint || '';
+    updatePanelStatus('tavily', newsState.tavilyAvailable, false);
+    updatePanelStatus('naver', newsState.naverAvailable, false);
+    updateAnalysisStatus(newsState.geminiAvailable, false);
+    updateAnalysisMeta();
+    return health;
+  } catch (err) {
+    newsState.geminiHint = err.message || '';
+    updateAnalysisMeta();
+    return null;
+  }
+}
+
 async function initNews() {
   setupNewsSearch();
 
   try {
-    const health = await getDashboardAPI().health();
-    newsState.tavilyAvailable = health.tavilyConfigured;
-    newsState.naverAvailable = health.naverConfigured;
-
-    updatePanelStatus('tavily', newsState.tavilyAvailable, false);
-    updatePanelStatus('naver', newsState.naverAvailable, false);
+    await refreshApiHealth();
 
     const tasks = [];
 
@@ -314,6 +344,7 @@ async function initNews() {
     }
 
     if (tasks.length) await Promise.all(tasks);
+    updateAnalysisMeta();
   } catch (err) {
     showPanelError('tavily', err.message || 'API 서버 연결 실패');
     showPanelError('naver', err.message || 'API 서버 연결 실패');
@@ -546,6 +577,179 @@ function createContractChart() {
   });
 }
 
+function getAnalysisQuery() {
+  const tavily = newsState.tavilyQuery?.trim();
+  const naver = newsState.naverQuery?.trim();
+  if (tavily && naver) {
+    return tavily === naver ? tavily : `${tavily} / ${naver}`;
+  }
+  return tavily || naver || '';
+}
+
+function buildAnalysisPayload() {
+  return {
+    query: getAnalysisQuery() || newsState.tavilyQuery || newsState.naverQuery || '방산',
+    globalNews: newsState.tavilyResults.map((item) => ({
+      title: item.title,
+      snippet: item.snippet,
+      source: item.source,
+      url: item.url,
+    })),
+    domesticNews: newsState.naverResults.map((item) => ({
+      title: item.title,
+      snippet: item.snippet,
+      source: item.source,
+      url: item.url,
+    })),
+  };
+}
+
+function hasAnalysisData() {
+  return newsState.tavilyResults.length > 0 || newsState.naverResults.length > 0;
+}
+
+function renderAnalysisMarkdown(text) {
+  const lines = text.split('\n');
+  const html = [];
+  let inList = false;
+
+  const closeList = () => {
+    if (inList) {
+      html.push('</ul>');
+      inList = false;
+    }
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('## ')) {
+      closeList();
+      html.push(`<h3 class="ai-h3">${escapeHtml(trimmed.slice(3))}</h3>`);
+    } else if (trimmed.startsWith('### ')) {
+      closeList();
+      html.push(`<h4 class="ai-h4">${escapeHtml(trimmed.slice(4))}</h4>`);
+    } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+      if (!inList) {
+        html.push('<ul class="ai-list">');
+        inList = true;
+      }
+      html.push(`<li>${escapeHtml(trimmed.slice(2))}</li>`);
+    } else if (trimmed === '') {
+      closeList();
+    } else {
+      closeList();
+      html.push(`<p>${escapeHtml(trimmed)}</p>`);
+    }
+  }
+  closeList();
+  return html.join('');
+}
+
+function updateAnalysisMeta() {
+  const queryEl = document.getElementById('analysisQueryDisplay');
+  const globalEl = document.getElementById('analysisGlobalCount');
+  const domesticEl = document.getElementById('analysisDomesticCount');
+  const emptyEl = document.getElementById('analysisEmpty');
+  const runBtn = document.getElementById('analysisRunBtn');
+  const hintEl = document.getElementById('analysisHint');
+
+  if (!queryEl) return;
+
+  const query = getAnalysisQuery() || '—';
+  queryEl.textContent = query;
+  globalEl.textContent = String(newsState.tavilyResults.length);
+  domesticEl.textContent = String(newsState.naverResults.length);
+
+  const hasData = hasAnalysisData();
+  emptyEl.classList.toggle('hidden', hasData);
+  if (runBtn) runBtn.disabled = !hasData || !newsState.geminiAvailable;
+
+  if (!newsState.geminiAvailable) {
+    if (newsState.geminiLegacyServer) {
+      hintEl.textContent =
+        '구버전 서버가 실행 중입니다. 서버 터미널에서 Ctrl+C로 종료 후 python server/app.py 를 다시 실행하고 Ctrl+F5로 새로고침하세요.';
+    } else if (newsState.geminiHint) {
+      hintEl.textContent = newsState.geminiHint;
+    } else if (hintEl) {
+      hintEl.textContent = 'GEMINI_API_KEY가 설정되지 않았습니다. .env 확인 후 서버 재시작 및 Ctrl+F5 새로고침하세요.';
+    }
+  } else if (!hasData) {
+    hintEl.textContent = '뉴스 검색 탭에서 검색을 실행한 후 분석할 수 있습니다.';
+  } else if (hintEl) {
+    hintEl.textContent = `${newsState.tavilyResults.length + newsState.naverResults.length}건의 기사를 분석합니다.`;
+  }
+}
+
+function updateAnalysisStatus(available, live) {
+  const tag = document.getElementById('analysisStatusTag');
+  if (!tag) return;
+
+  if (!available) {
+    tag.textContent = 'OFFLINE';
+    tag.classList.remove('live');
+    return;
+  }
+  tag.textContent = live ? 'LIVE' : 'READY';
+  tag.classList.add('live');
+}
+
+function setAnalysisLoading(loading) {
+  document.getElementById('analysisLoading')?.classList.toggle('hidden', !loading);
+  document.getElementById('analysisRunBtn')?.toggleAttribute('disabled', loading);
+}
+
+function showAnalysisError(message) {
+  const errEl = document.getElementById('analysisError');
+  const msgEl = document.getElementById('analysisErrorMsg');
+  if (msgEl) msgEl.textContent = message;
+  errEl?.classList.remove('hidden');
+}
+
+function hideAnalysisError() {
+  document.getElementById('analysisError')?.classList.add('hidden');
+}
+
+async function runAnalysis() {
+  if (!hasAnalysisData()) {
+    showAnalysisError('분석할 뉴스가 없습니다. 먼저 뉴스 검색을 실행하세요.');
+    return;
+  }
+
+  await refreshApiHealth();
+  if (!newsState.geminiAvailable) {
+    showAnalysisError(newsState.geminiHint || 'GEMINI_API_KEY가 설정되지 않았습니다.');
+    return;
+  }
+
+  hideAnalysisError();
+  setAnalysisLoading(true);
+  document.getElementById('analysisResult')?.classList.add('hidden');
+
+  try {
+    const payload = buildAnalysisPayload();
+    const data = await getDashboardAPI().analyzeNews(payload);
+
+    const resultEl = document.getElementById('analysisResult');
+    if (resultEl) {
+      resultEl.innerHTML = renderAnalysisMarkdown(data.analysis || '');
+      resultEl.classList.remove('hidden');
+    }
+    document.getElementById('analysisEmpty')?.classList.add('hidden');
+    updateAnalysisStatus(newsState.geminiAvailable, true);
+  } catch (err) {
+    showAnalysisError(err.message || 'AI 분석 실패');
+    updateAnalysisStatus(newsState.geminiAvailable, false);
+  } finally {
+    setAnalysisLoading(false);
+  }
+}
+
+function setupAnalysis() {
+  document.getElementById('analysisRunBtn')?.addEventListener('click', runAnalysis);
+  document.getElementById('analysisRetryBtn')?.addEventListener('click', runAnalysis);
+  updateAnalysisMeta();
+}
+
 function initCharts() {
   createSpendingChart();
   createRegionChart();
@@ -567,9 +771,11 @@ function setupNav() {
         market: '.chart-grid',
         tech: '.tech-trends',
         news: '#newsSection',
+        analysis: '#analysisSection',
       };
       const el = document.querySelector(targets[section]);
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (section === 'analysis') refreshApiHealth();
     });
   });
 }
@@ -594,5 +800,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initCharts();
   setupNav();
   setupRefresh();
+  setupAnalysis();
   initNews();
 });

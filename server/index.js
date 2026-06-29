@@ -3,7 +3,8 @@ const express = require('express');
 const dotenv = require('dotenv');
 const { searchTavily } = require('../lib/tavily');
 const { searchNaverNews } = require('../lib/naver');
-const { getTavilyApiKey, getNaverCredentials } = require('../lib/env');
+const { analyzeNews } = require('../lib/gemini');
+const { getTavilyApiKey, getNaverCredentials, getGeminiApiKey, getGeminiSetupHint } = require('../lib/env');
 
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
@@ -42,11 +43,19 @@ app.post('/api/naver/search', async (req, res) => {
   res.status(result.status).json(result.data);
 });
 
+app.post('/api/gemini/analyze', async (req, res) => {
+  const result = await analyzeNews(getGeminiApiKey(), req.body);
+  res.status(result.status).json(result.data);
+});
+
 app.get('/api/health', (_req, res) => {
+  const geminiKey = getGeminiApiKey();
   res.json({
     status: 'ok',
     tavilyConfigured: Boolean(getTavilyApiKey()),
     naverConfigured: Boolean(getNaverCredentials()),
+    geminiConfigured: Boolean(geminiKey),
+    geminiHint: geminiKey ? null : getGeminiSetupHint(),
     runtime: 'node',
   });
 });

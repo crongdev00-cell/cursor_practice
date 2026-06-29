@@ -66,6 +66,14 @@ window.DashboardAPI = {
     });
   },
 
+  analyzeNews(payload) {
+    return this.request('/api/gemini/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  },
+
   health() {
     return this.request('/api/health');
   },
