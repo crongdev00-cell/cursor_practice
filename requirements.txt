@@ -1,0 +1,2 @@
+# Python 로컬 서버 (server/app.py)는 표준 라이브러리만 사용합니다.
+# pip install 불필요 — Python 3.9+ 만 있으면 됩니다.

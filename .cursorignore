@@ -1,0 +1,7 @@
+﻿# Cursor AI가 읽지 않도록 비밀 정보 차단
+.env
+.env.local
+.env.*.local
+secrets/
+*.pem
+*.key

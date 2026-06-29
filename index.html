@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>방산 동향 대시보드 | Defense Trends</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+            <path d="M2 17l10 5 10-5"/>
+            <path d="M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <div>
+          <span class="brand-title">DEFENSE</span>
+          <span class="brand-sub">INTELLIGENCE</span>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" data-section="overview">
+          <span class="nav-icon">◈</span> 종합 현황
+        </a>
+        <a href="#" class="nav-item" data-section="market">
+          <span class="nav-icon">◈</span> 시장 분석
+        </a>
+        <a href="#" class="nav-item" data-section="tech">
+          <span class="nav-icon">◈</span> 기술 트렌드
+        </a>
+        <a href="#" class="nav-item" data-section="news">
+          <span class="nav-icon">◈</span> 뉴스 &amp; 계약
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <span class="status-dot"></span>
+        <span>실시간 모니터링</span>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1>글로벌 방산 동향 대시보드</h1>
+          <p class="subtitle">2024–2026 방위산업 시장 · 수출 · 기술 트렌드 종합 분석</p>
+        </div>
+        <div class="topbar-right">
+          <div class="date-badge">
+            <span class="label">기준일</span>
+            <span id="currentDate" class="value"></span>
+          </div>
+          <button class="refresh-btn" id="refreshBtn" title="데이터 새로고침">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- KPI Cards -->
+      <section class="kpi-grid">
+        <article class="kpi-card">
+          <div class="kpi-header">
+            <span class="kpi-label">글로벌 방위비</span>
+            <span class="kpi-trend up">+9.2%</span>
+          </div>
+          <div class="kpi-value">$2.46<span class="unit">조</span></div>
+          <div class="kpi-detail">2025년 SIPRI 추정치 (USD)</div>
+          <div class="kpi-bar"><div class="kpi-bar-fill" style="width:82%"></div></div>
+        </article>
+        <article class="kpi-card">
+          <div class="kpi-header">
+            <span class="kpi-label">한국 방산 수출</span>
+            <span class="kpi-trend up">+23.1%</span>
+          </div>
+          <div class="kpi-value">$17.3<span class="unit">B</span></div>
+          <div class="kpi-detail">2024년 역대 최고 실적</div>
+          <div class="kpi-bar"><div class="kpi-bar-fill accent" style="width:91%"></div></div>
+        </article>
+        <article class="kpi-card">
+          <div class="kpi-header">
+            <span class="kpi-label">NATO 국방비 GDP 비율</span>
+            <span class="kpi-trend up">+1.4%p</span>
+          </div>
+          <div class="kpi-value">2.7<span class="unit">%</span></div>
+          <div class="kpi-detail">32개 회원국 평균 (2025)</div>
+          <div class="kpi-bar"><div class="kpi-bar-fill" style="width:68%"></div></div>
+        </article>
+        <article class="kpi-card">
+          <div class="kpi-header">
+            <span class="kpi-label">무인체계 시장</span>
+            <span class="kpi-trend up">+18.7%</span>
+          </div>
+          <div class="kpi-value">$28.4<span class="unit">B</span></div>
+          <div class="kpi-detail">드론·UUV·UGV 통합 시장</div>
+          <div class="kpi-bar"><div class="kpi-bar-fill accent" style="width:76%"></div></div>
+        </article>
+      </section>
+
+      <!-- Charts Row 1 -->
+      <section class="chart-grid">
+        <article class="chart-card wide">
+          <div class="card-header">
+            <h2>주요국 방위비 추이</h2>
+            <span class="card-tag">2019 – 2025 (조 USD)</span>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="spendingChart"></canvas>
+          </div>
+        </article>
+        <article class="chart-card">
+          <div class="card-header">
+            <h2>지역별 시장 점유율</h2>
+            <span class="card-tag">2025</span>
+          </div>
+          <div class="chart-wrap doughnut">
+            <canvas id="regionChart"></canvas>
+          </div>
+          <div class="legend-list" id="regionLegend"></div>
+        </article>
+      </section>
+
+      <!-- Charts Row 2 -->
+      <section class="chart-grid">
+        <article class="chart-card">
+          <div class="card-header">
+            <h2>핵심 기술 투자 비중</h2>
+            <span class="card-tag">R&amp;D 예산 분배</span>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="techChart"></canvas>
+          </div>
+        </article>
+        <article class="chart-card">
+          <div class="card-header">
+            <h2>한국 방산 수출 품목</h2>
+            <span class="card-tag">2024년</span>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="exportChart"></canvas>
+          </div>
+        </article>
+        <article class="chart-card">
+          <div class="card-header">
+            <h2>분기별 계약 체결</h2>
+            <span class="card-tag">글로벌 M&amp;A · 수주</span>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="contractChart"></canvas>
+          </div>
+        </article>
+      </section>
+
+      <!-- Bottom Row -->
+      <section class="bottom-grid">
+        <article class="table-card">
+          <div class="card-header">
+            <h2>글로벌 방산 기업 TOP 10</h2>
+            <span class="card-tag">2024 매출 기준</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>기업</th>
+                  <th>국가</th>
+                  <th>매출</th>
+                  <th>전년 대비</th>
+                  <th>주력 분야</th>
+                </tr>
+              </thead>
+              <tbody id="companyTable"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="news-card">
+          <div class="card-header">
+            <h2>방산 뉴스 검색</h2>
+            <span class="card-tag live" id="newsStatusTag">TAVILY</span>
+          </div>
+          <div class="news-search">
+            <form id="newsSearchForm" class="news-search-form">
+              <input
+                type="search"
+                id="newsSearchInput"
+                class="news-search-input"
+                placeholder="키워드 검색 (예: K2 전차 수출, NATO 방산)"
+                autocomplete="off"
+              />
+              <button type="submit" id="newsSearchBtn" class="news-search-btn" title="검색">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                </svg>
+              </button>
+            </form>
+            <div class="news-chips" id="newsChips">
+              <button type="button" class="news-chip active" data-query="defense industry news latest">최신 뉴스</button>
+              <button type="button" class="news-chip" data-query="Korea defense export news">한국 방산</button>
+              <button type="button" class="news-chip" data-query="NATO defense spending contract">NATO</button>
+              <button type="button" class="news-chip" data-query="military drone UAV news">무인기</button>
+              <button type="button" class="news-chip" data-query="defense contract award">수출·계약</button>
+            </div>
+          </div>
+          <div id="newsLoading" class="news-state hidden">
+            <div class="news-spinner"></div>
+            <span>Tavily에서 뉴스 검색 중…</span>
+          </div>
+          <div id="newsError" class="news-state news-error hidden">
+            <span id="newsErrorMsg">검색에 실패했습니다.</span>
+            <button type="button" id="newsRetryBtn" class="news-retry-btn">다시 시도</button>
+          </div>
+          <ul class="news-list" id="newsList"></ul>
+        </article>
+      </section>
+
+      <section class="tech-trends">
+        <div class="card-header">
+          <h2>2026 핵심 기술 트렌드</h2>
+          <span class="card-tag">Strategic Focus Areas</span>
+        </div>
+        <div class="trend-cards" id="trendCards"></div>
+      </section>
+
+      <footer class="footer">
+        <p>※ 본 대시보드의 데이터는 SIPRI, KOTRA, Defense News 등 공개 자료를 기반으로 한 참고용 시뮬레이션입니다.</p>
+      </footer>
+    </main>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>국내 주요 도시 날씨 | Open-Meteo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="stylesheet" href="css/weather.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="header-left">
+        <h1>🇰🇷 국내 주요 도시 날씨</h1>
+        <p class="subtitle">Open-Meteo 실시간 기상 데이터 · OpenStreetMap</p>
+      </div>
+      <div class="header-right">
+        <span class="update-label">마지막 갱신</span>
+        <span id="lastUpdated" class="update-time">—</span>
+        <button id="refreshBtn" class="refresh-btn" title="새로고침">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="content">
+      <section class="map-section">
+        <div id="map"></div>
+        <div class="map-legend">
+          <span class="legend-title">기온</span>
+          <div class="legend-bar"></div>
+          <div class="legend-labels"><span>−10°</span><span>0°</span><span>15°</span><span>30°+</span></div>
+        </div>
+      </section>
+
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <h2>도시 목록</h2>
+          <span id="cityCount" class="badge">10개 도시</span>
+        </div>
+        <div id="loadingState" class="loading">
+          <div class="spinner"></div>
+          <p>날씨 데이터 불러오는 중…</p>
+        </div>
+        <div id="errorState" class="error hidden">
+          <p>데이터를 불러오지 못했습니다.</p>
+          <button id="retryBtn">다시 시도</button>
+        </div>
+        <ul id="cityList" class="city-list hidden"></ul>
+      </aside>
+    </div>
+
+    <footer class="footer">
+      <p>
+        기상 데이터: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>
+        · 지도: <a href="https://www.openstreetmap.org/" target="_blank" rel="noopener">OpenStreetMap</a>
+        · 무료 API · API 키 불필요
+      </p>
+    </footer>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="js/weather.js"></script>
+</body>
+</html>
