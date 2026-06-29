@@ -1,4 +1,4 @@
-const { getTavilyApiKey, getNaverCredentials, getGeminiApiKey, getGeminiSetupHint } = require('../lib/env');
+const { getTavilyApiKey, getNaverCredentials, getGeminiApiKey, getGeminiSetupHint, getGeminiModel, getDapaServiceKey, getDapaSetupHint } = require('../lib/env');
 
 module.exports = (req, res) => {
   try {
@@ -11,11 +11,14 @@ module.exports = (req, res) => {
 
     return res.status(200).json({
       status: 'ok',
-      serverVersion: 2,
+      serverVersion: 3,
       tavilyConfigured: Boolean(getTavilyApiKey()),
       naverConfigured: Boolean(getNaverCredentials()),
       geminiConfigured: Boolean(geminiKey),
       geminiHint: geminiKey ? null : getGeminiSetupHint(),
+      geminiModel: getGeminiModel(),
+      dapaConfigured: Boolean(getDapaServiceKey()),
+      dapaHint: getDapaServiceKey() ? null : getDapaSetupHint(),
       runtime: 'vercel',
       vercelEnv: process.env.VERCEL_ENV || null,
     });

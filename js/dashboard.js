@@ -43,6 +43,7 @@ const newsState = {
   naverAvailable: false,
   geminiAvailable: false,
   geminiHint: '',
+  geminiModel: 'gemini-2.5-flash',
   geminiLegacyServer: false,
   tavilyQuery: DEFAULT_TAVILY_QUERY,
   naverQuery: DEFAULT_NAVER_QUERY,
@@ -311,6 +312,7 @@ async function refreshApiHealth() {
     newsState.geminiLegacyServer = health.serverVersion !== 2 && health.geminiConfigured === undefined;
     newsState.geminiAvailable = Boolean(health.geminiConfigured);
     newsState.geminiHint = health.geminiHint || '';
+    newsState.geminiModel = health.geminiModel || 'gemini-2.5-flash';
     updatePanelStatus('tavily', newsState.tavilyAvailable, false);
     updatePanelStatus('naver', newsState.naverAvailable, false);
     updateAnalysisStatus(newsState.geminiAvailable, false);
@@ -652,8 +654,11 @@ function updateAnalysisMeta() {
   const emptyEl = document.getElementById('analysisEmpty');
   const runBtn = document.getElementById('analysisRunBtn');
   const hintEl = document.getElementById('analysisHint');
+  const modelTag = document.getElementById('analysisModelTag');
 
   if (!queryEl) return;
+
+  if (modelTag) modelTag.textContent = newsState.geminiModel || 'gemini-2.5-flash';
 
   const query = getAnalysisQuery() || '—';
   queryEl.textContent = query;
@@ -771,6 +776,7 @@ function setupNav() {
         market: '.chart-grid',
         tech: '.tech-trends',
         news: '#newsSection',
+        bids: '#bidSection',
         analysis: '#analysisSection',
       };
       const el = document.querySelector(targets[section]);
@@ -802,4 +808,5 @@ document.addEventListener('DOMContentLoaded', () => {
   setupRefresh();
   setupAnalysis();
   initNews();
+  if (typeof initBids === 'function') initBids();
 });

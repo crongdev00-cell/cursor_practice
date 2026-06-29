@@ -936,6 +936,215 @@ tbody tr:last-child td {
   display: none !important;
 }
 
+/* DAPA Bid Section */
+.bid-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-top: 3px solid #c27803;
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.bid-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.bid-header h2 {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.bid-subtitle {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.bid-section .card-tag.live {
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.bid-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 14px;
+}
+
+.bid-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+}
+
+.bid-meta-label {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+
+.bid-refresh-btn {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.bid-refresh-btn:hover {
+  border-color: #f59e0b;
+  color: #f59e0b;
+}
+
+.bid-refresh-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.bid-search-form {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.bid-days-select {
+  height: 38px;
+  padding: 0 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 0.82rem;
+  flex-shrink: 0;
+}
+
+.bid-search-btn {
+  height: 38px;
+  padding: 0 18px;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #b45309, #f59e0b);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  font-family: var(--font);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bid-search-btn:hover {
+  opacity: 0.92;
+}
+
+.bid-spinner {
+  border-top-color: #f59e0b;
+}
+
+.bid-retry-btn {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #f59e0b;
+}
+
+.bid-table-wrap {
+  max-height: 520px;
+  overflow: auto;
+}
+
+.bid-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.bid-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-secondary);
+  text-align: left;
+  padding: 10px 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.72rem;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.bid-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  vertical-align: top;
+}
+
+.bid-table tbody tr:hover {
+  background: var(--bg-card-hover);
+}
+
+.bid-row--urgent {
+  background: rgba(245, 158, 11, 0.06);
+}
+
+.bid-title-cell {
+  min-width: 220px;
+  max-width: 320px;
+}
+
+.bid-title {
+  display: block;
+  color: var(--text-primary);
+  font-weight: 500;
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+.bid-no {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
+
+.bid-urgent-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #fff;
+  background: #dc2626;
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+.bid-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 32px !important;
+}
+
 /* AI Analysis Section */
 .analysis-section {
   background: var(--bg-card);

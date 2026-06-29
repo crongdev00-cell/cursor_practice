@@ -4,7 +4,8 @@ const dotenv = require('dotenv');
 const { searchTavily } = require('../lib/tavily');
 const { searchNaverNews } = require('../lib/naver');
 const { analyzeNews } = require('../lib/gemini');
-const { getTavilyApiKey, getNaverCredentials, getGeminiApiKey, getGeminiSetupHint } = require('../lib/env');
+const { searchBidAnnouncements } = require('../lib/dapa');
+const { getTavilyApiKey, getNaverCredentials, getGeminiApiKey, getGeminiSetupHint, getGeminiModel, getDapaServiceKey } = require('../lib/env');
 
 dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
@@ -48,6 +49,11 @@ app.post('/api/gemini/analyze', async (req, res) => {
   res.status(result.status).json(result.data);
 });
 
+app.post('/api/dapa/bids', async (req, res) => {
+  const result = await searchBidAnnouncements(getDapaServiceKey(), req.body);
+  res.status(result.status).json(result.data);
+});
+
 app.get('/api/health', (_req, res) => {
   const geminiKey = getGeminiApiKey();
   res.json({
@@ -56,6 +62,8 @@ app.get('/api/health', (_req, res) => {
     naverConfigured: Boolean(getNaverCredentials()),
     geminiConfigured: Boolean(geminiKey),
     geminiHint: geminiKey ? null : getGeminiSetupHint(),
+    geminiModel: getGeminiModel(),
+    dapaConfigured: Boolean(getDapaServiceKey()),
     runtime: 'node',
   });
 });

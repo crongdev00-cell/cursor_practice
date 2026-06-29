@@ -74,6 +74,14 @@ window.DashboardAPI = {
     });
   },
 
+  searchDapaBids(options = {}) {
+    return this.request('/api/dapa/bids', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(options),
+    });
+  },
+
   health() {
     return this.request('/api/health');
   },

@@ -16,6 +16,8 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
+from datetime import date, timedelta
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -23,7 +25,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 TAVILY_SEARCH_URL = "https://api.tavily.com/search"
 NAVER_NEWS_URL = "https://openapi.naver.com/v1/search/news.json"
-BLOCKED_PREFIXES = ("/.env", "/server/", "/node_modules/", "/.git/", "/lib/", "/api/")
+BLOCKED_PREFIXES = ("/.env", "/server/", "/node_modules/", "/.git/", "/lib/", "/api/", "/prompt/")
 MAX_BODY_BYTES = 32 * 1024
 
 
@@ -32,7 +34,7 @@ def load_env(env_path: Path) -> dict[str, str]:
     if not env_path.is_file():
         return env
 
-    for line in env_path.read_text(encoding="utf-8").splitlines():
+    for line in env_path.read_text(encoding="utf-8-sig").splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
@@ -45,10 +47,52 @@ ENV = load_env(ROOT / ".env")
 TAVILY_API_KEY = ENV.get("TAVILY_API_KEY") or os.environ.get("TAVILY_API_KEY", "")
 NAVER_CLIENT_ID = ENV.get("NAVER_CLIENT_ID") or os.environ.get("NAVER_CLIENT_ID", "")
 NAVER_CLIENT_SECRET = ENV.get("NAVER_CLIENT_SECRET") or os.environ.get("NAVER_CLIENT_SECRET", "")
-GEMINI_MODEL = "gemini-2.5-flash-lite"
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL_PATTERN = re.compile(r"^gemini-[a-z0-9.-]+$", re.IGNORECASE)
 GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
 PORT = int(ENV.get("PORT") or os.environ.get("PORT") or 3000)
 MAX_ANALYZE_BODY_BYTES = 128 * 1024
+PROMPT_DIR = ROOT / "prompt"
+DEFAULT_PROMPT_FILE = "news-analysis.md"
+_prompt_cache: dict[str, tuple[float, str]] = {}
+
+
+def load_prompt_template(name: str = DEFAULT_PROMPT_FILE) -> str:
+    path = PROMPT_DIR / name
+    if not path.is_file():
+        raise FileNotFoundError(f"프롬프트 파일을 찾을 수 없습니다: {path}")
+
+    mtime = path.stat().st_mtime
+    cached = _prompt_cache.get(name)
+    if cached and cached[0] == mtime:
+        return cached[1]
+
+    text = path.read_text(encoding="utf-8")
+    _prompt_cache[name] = (mtime, text)
+    return text
+
+
+def format_news_items(items: list, label: str) -> str:
+    if not items:
+        return f"{label}: (검색 결과 없음)"
+    lines = []
+    for i, item in enumerate(items[:8], 1):
+        title = item.get("title") or "제목 없음"
+        snippet = str(item.get("snippet") or item.get("description") or "")[:200]
+        source = item.get("source") or item.get("url") or ""
+        lines.append(f"{i}. [{title}] {snippet} (출처: {source})")
+    return f"{label}:\n" + "\n".join(lines)
+
+
+def build_analysis_prompt(query: str, global_news: list, domestic_news: list) -> str:
+    template = load_prompt_template()
+    return (
+        template.replace("{{QUERY}}", query)
+        .replace("{{GLOBAL_NEWS}}", format_news_items(global_news, "국외 뉴스"))
+        .replace("{{DOMESTIC_NEWS}}", format_news_items(domestic_news, "국내 뉴스"))
+    )
+
+
 GEMINI_PLACEHOLDER_VALUES = {
     "your-gemini-api-key",
     "your-api-key-here",
@@ -77,6 +121,71 @@ def gemini_setup_hint() -> str:
     if lowered in GEMINI_PLACEHOLDER_VALUES or lowered.startswith("your-"):
         return "GEMINI_API_KEY가 예시 값입니다. Google AI Studio에서 발급한 실제 키로 교체하세요."
     return "서버를 재시작(Ctrl+C 후 python server/app.py)하고 페이지를 Ctrl+F5로 새로고침하세요."
+
+
+def resolve_gemini_model() -> str:
+    env = load_env(ROOT / ".env")
+    raw = (env.get("GEMINI_MODEL") or os.environ.get("GEMINI_MODEL") or "").strip().strip('"').strip("'")
+    if not raw or not GEMINI_MODEL_PATTERN.match(raw):
+        return DEFAULT_GEMINI_MODEL
+    return raw
+
+
+DAPA_BID_API_URL = "https://apis.data.go.kr/1690000/BidPblancInfoService/getDmstcCmpetBidPblancList"
+DAPA_ITEM_FIELDS = (
+    "pblancSeCode", "pblancSe", "demandYear", "pblancDate", "pblancNo", "pblancOdr",
+    "g2bPblancNo", "g2bPblancOdr", "dcsNo", "bidNm", "orntCode", "ornt",
+    "prdctnAbltyPresentnClosDt", "bidPartcptRegistClosDt", "biddocPresentnClosDt",
+    "opengDt", "excutTyCode", "excutTy", "cntrctMth", "bidStle",
+    "bsisPrdprcApplcAt", "bsicExpt", "bsisPrdprcOthbcAt", "busiDivs",
+)
+DAPA_PLACEHOLDER_VALUES = {"your-dapa-service-key", "your-api-key-here", "your_api_key_here"}
+
+
+def resolve_dapa_service_key() -> str:
+    env = load_env(ROOT / ".env")
+    key = (env.get("DAPA_SERVICE_KEY") or os.environ.get("DAPA_SERVICE_KEY") or "").strip().strip('"').strip("'")
+    if not key:
+        return ""
+    lowered = key.lower()
+    if lowered in DAPA_PLACEHOLDER_VALUES or lowered.startswith("your-"):
+        return ""
+    return key
+
+
+def dapa_setup_hint() -> str:
+    env = load_env(ROOT / ".env")
+    raw = (env.get("DAPA_SERVICE_KEY") or os.environ.get("DAPA_SERVICE_KEY") or "").strip()
+    if not raw:
+        return ".env 파일에 DAPA_SERVICE_KEY=공공데이터포털_서비스키 를 추가하세요."
+    lowered = raw.lower().strip('"').strip("'")
+    if lowered in DAPA_PLACEHOLDER_VALUES or lowered.startswith("your-"):
+        return "DAPA_SERVICE_KEY가 예시 값입니다. 공공데이터포털에서 발급한 실제 키로 교체하세요."
+    return "서버를 재시작(Ctrl+C 후 python server/app.py)하고 페이지를 Ctrl+F5로 새로고침하세요."
+
+
+def parse_dapa_xml(xml_text: str) -> dict:
+    root = ET.fromstring(xml_text)
+    header = root.find("header")
+    result_code = (header.findtext("resultCode") or "").strip() if header is not None else ""
+    result_msg = (header.findtext("resultMsg") or "").strip() if header is not None else ""
+
+    if result_code and result_code != "00":
+        return {"error": result_msg or f"공공데이터 API 오류 (코드: {result_code})"}
+
+    body = root.find("body")
+    items: list[dict[str, str]] = []
+    if body is not None:
+        for item_el in body.findall(".//item"):
+            item = {field: (item_el.findtext(field) or "").strip() for field in DAPA_ITEM_FIELDS}
+            items.append(item)
+
+    return {
+        "totalCount": (body.findtext("totalCount") if body is not None else "") or str(len(items)),
+        "pageNo": (body.findtext("pageNo") if body is not None else "") or "1",
+        "numOfRows": (body.findtext("numOfRows") if body is not None else "") or str(len(items)),
+        "items": items,
+    }
 
 
 def strip_html(text: str) -> str:
@@ -140,11 +249,14 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 HTTPStatus.OK,
                 {
                     "status": "ok",
-                    "serverVersion": 2,
+                    "serverVersion": 3,
                     "tavilyConfigured": bool(TAVILY_API_KEY),
                     "naverConfigured": bool(NAVER_CLIENT_ID and NAVER_CLIENT_SECRET),
                     "geminiConfigured": bool(gemini_key),
                     "geminiHint": gemini_setup_hint() if not gemini_key else None,
+                    "geminiModel": resolve_gemini_model(),
+                    "dapaConfigured": bool(resolve_dapa_service_key()),
+                    "dapaHint": dapa_setup_hint() if not resolve_dapa_service_key() else None,
                     "runtime": "python",
                 },
             )
@@ -287,37 +399,84 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError):
             self.end_json(HTTPStatus.BAD_GATEWAY, {"error": "네이버 검색 API에 연결할 수 없습니다."})
 
-    def build_gemini_prompt(self, query: str, global_news: list, domestic_news: list) -> str:
-        def format_items(items: list, label: str) -> str:
-            if not items:
-                return f"{label}: (검색 결과 없음)\n"
-            lines = []
-            for i, item in enumerate(items[:8], 1):
-                title = item.get("title") or "제목 없음"
-                snippet = str(item.get("snippet") or item.get("description") or "")[:200]
-                source = item.get("source") or item.get("url") or ""
-                lines.append(f"{i}. [{title}] {snippet} (출처: {source})")
-            return f"{label}:\n" + "\n".join(lines) + "\n"
+    def handle_dapa_bids(self, body: dict) -> None:
+        service_key = resolve_dapa_service_key()
+        if not service_key:
+            self.end_json(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {"error": f"DAPA_SERVICE_KEY가 설정되지 않았습니다. {dapa_setup_hint()}"},
+            )
+            return
 
-        return (
-            "당신은 방위산업(방산) 전문 애널리스트입니다.\n"
-            "아래 국외(Tavily) 및 국내(네이버) 뉴스 검색 결과를 분석하여 한국어로 보고서를 작성하세요.\n\n"
-            f'검색 키워드: "{query}"\n\n'
-            f"{format_items(global_news, '국외 뉴스')}\n"
-            f"{format_items(domestic_news, '국내 뉴스')}\n"
-            "다음 형식의 마크다운으로 작성하세요:\n\n"
-            "## 종합 요약\n"
-            "(3~4문장으로 핵심 동향 요약)\n\n"
-            "## 국외 동향\n"
-            "(글로벌 방산 시장·정책·계약 관련 인사이트, bullet 3~5개)\n\n"
-            "## 국내 동향\n"
-            "(한국 방산·수출·국방 정책 관련 인사이트, bullet 3~5개)\n\n"
-            "## 핵심 키워드\n"
-            "(쉼표로 구분된 5~8개 키워드)\n\n"
-            "## 시사점 및 전망\n"
-            "(전략적 시사점 2~3문장)\n\n"
-            "주의: 검색 결과에 없는 내용은 추측하지 말고, 제공된 기사 기반으로만 분석하세요."
-        )
+        try:
+            page_no = max(1, min(int(body.get("pageNo", 1)), 100))
+        except (TypeError, ValueError):
+            page_no = 1
+
+        try:
+            num_of_rows = max(1, min(int(body.get("numOfRows", 10)), 50))
+        except (TypeError, ValueError):
+            num_of_rows = 10
+
+        try:
+            days = max(1, min(int(body.get("days", 30)), 90))
+        except (TypeError, ValueError):
+            days = 30
+
+        end_dt = date.today()
+        start_dt = end_dt - timedelta(days=days)
+        params: dict[str, str] = {
+            "serviceKey": service_key,
+            "pageNo": str(page_no),
+            "numOfRows": str(num_of_rows),
+            "anmtDateBegin": start_dt.strftime("%Y%m%d"),
+            "anmtDateEnd": end_dt.strftime("%Y%m%d"),
+        }
+
+        bid_nm = body.get("bidNm")
+        if isinstance(bid_nm, str) and bid_nm.strip():
+            params["bidNm"] = bid_nm.strip()[:100]
+
+        ornt_code = body.get("orntCode")
+        if isinstance(ornt_code, str) and ornt_code.strip():
+            params["orntCode"] = ornt_code.strip()[:20]
+
+        url = f"{DAPA_BID_API_URL}?{urllib.parse.urlencode(params)}"
+
+        try:
+            request = urllib.request.Request(url, method="GET")
+            with urllib.request.urlopen(request, timeout=30) as response:
+                xml_text = response.read().decode("utf-8")
+
+            parsed = parse_dapa_xml(xml_text)
+            if parsed.get("error"):
+                self.end_json(HTTPStatus.BAD_GATEWAY, {"error": parsed["error"]})
+                return
+
+            self.end_json(
+                HTTPStatus.OK,
+                {
+                    "totalCount": parsed["totalCount"],
+                    "pageNo": parsed["pageNo"],
+                    "numOfRows": parsed["numOfRows"],
+                    "searchPeriod": {
+                        "begin": params["anmtDateBegin"],
+                        "end": params["anmtDateEnd"],
+                    },
+                    "items": parsed["items"],
+                },
+            )
+        except ET.ParseError:
+            self.end_json(HTTPStatus.BAD_GATEWAY, {"error": "입찰공고 API 응답 파싱 실패"})
+        except urllib.error.HTTPError as exc:
+            try:
+                error_body = exc.read().decode("utf-8")
+                message = error_body[:200] or "방위사업청 입찰공고 API 요청 실패"
+            except UnicodeDecodeError:
+                message = "방위사업청 입찰공고 API 요청 실패"
+            self.end_json(exc.code, {"error": message})
+        except (urllib.error.URLError, TimeoutError):
+            self.end_json(HTTPStatus.BAD_GATEWAY, {"error": "방위사업청 입찰공고 API에 연결할 수 없습니다."})
 
     def handle_gemini_analyze(self, body: dict) -> None:
         gemini_key = resolve_gemini_api_key()
@@ -347,8 +506,14 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self.end_json(HTTPStatus.BAD_REQUEST, {"error": "분석할 뉴스 데이터가 없습니다."})
             return
 
-        prompt = self.build_gemini_prompt(query, global_news, domestic_news)
-        url = f"{GEMINI_API_BASE}/models/{GEMINI_MODEL}:generateContent?key={gemini_key}"
+        try:
+            prompt = build_analysis_prompt(query, global_news, domestic_news)
+        except FileNotFoundError as exc:
+            self.end_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(exc)})
+            return
+
+        model = resolve_gemini_model()
+        url = f"{GEMINI_API_BASE}/models/{model}:generateContent?key={gemini_key}"
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {"temperature": 0.4, "maxOutputTokens": 2048},
@@ -378,7 +543,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
                 HTTPStatus.OK,
                 {
                     "analysis": text,
-                    "model": GEMINI_MODEL,
+                    "model": model,
                     "query": query,
                     "articleCount": {
                         "global": len(global_news),
@@ -421,6 +586,10 @@ class DashboardHandler(SimpleHTTPRequestHandler):
             self.handle_gemini_analyze(body)
             return
 
+        if path.startswith("/api/dapa/bids"):
+            self.handle_dapa_bids(body)
+            return
+
         self.end_json(
             HTTPStatus.NOT_FOUND,
             {"error": f"API 경로를 찾을 수 없습니다: {path}. python server/app.py 로 서버를 재시작하세요."},
@@ -444,6 +613,11 @@ def main() -> None:
         print(f"[WARN] GEMINI_API_KEY 미설정 - {gemini_setup_hint()}")
     else:
         print("  Gemini API: /api/gemini/analyze 준비됨")
+
+    if not resolve_dapa_service_key():
+        print(f"[WARN] DAPA_SERVICE_KEY 미설정 - {dapa_setup_hint()}")
+    else:
+        print("  DAPA API  : /api/dapa/bids 준비됨")
 
     try:
         server.serve_forever()
