@@ -12,6 +12,17 @@ const TAVILY_API_KEY = process.env.TAVILY_API_KEY;
 
 app.use(express.json({ limit: '32kb' }));
 
+app.use('/api', (_req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  next();
+});
+
+app.options('/api/*', (_req, res) => {
+  res.sendStatus(204);
+});
+
 app.use((req, res, next) => {
   const blocked = ['.env', '/server/', '/node_modules/', '/lib/'];
   if (blocked.some((p) => req.path.includes(p))) {

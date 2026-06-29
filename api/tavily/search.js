@@ -7,7 +7,17 @@ module.exports = async (req, res) => {
   }
 
   const apiKey = process.env.TAVILY_API_KEY;
-  const result = await searchTavily(apiKey, req.body);
+
+  let body = req.body;
+  if (typeof body === 'string') {
+    try {
+      body = JSON.parse(body);
+    } catch {
+      body = {};
+    }
+  }
+
+  const result = await searchTavily(apiKey, body);
 
   return res.status(result.status).json(result.data);
 };

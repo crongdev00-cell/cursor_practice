@@ -48,6 +48,13 @@ const DEFAULT_NEWS_QUERY = 'defense industry news latest';
 let currentNewsQuery = DEFAULT_NEWS_QUERY;
 let tavilyAvailable = false;
 
+function getTavilyAPI() {
+  if (!window.TavilyAPI) {
+    throw new Error('js/api.js 를 불러오지 못했습니다. 페이지를 새로고침(Ctrl+F5)하세요.');
+  }
+  return window.TavilyAPI;
+}
+
 const techTrends = [
   { icon: '🛸', name: '무인체계', growth: '+18.7%', desc: '드론·UUV·UGV' },
   { icon: '🤖', name: 'AI·자율화', growth: '+24.3%', desc: 'C2·타겟팅·군사 AI' },
@@ -194,7 +201,7 @@ async function searchNews(query) {
   }
 
   try {
-    const data = await TavilyAPI.search(query, {
+    const data = await getTavilyAPI().search(query, {
       max_results: 8,
       topic: 'news',
       search_depth: 'basic',
@@ -204,12 +211,7 @@ async function searchNews(query) {
     renderNewsItems(items);
     updateNewsStatusTag(true, true);
   } catch (err) {
-    if (!tavilyAvailable) {
-      renderFallbackNews();
-      showNewsError('서버 미연결 — python server/app.py 실행 후 Tavily 검색을 사용하세요.', false);
-    } else {
-      showNewsError(err.message || '뉴스 검색에 실패했습니다.');
-    }
+    showNewsError(err.message || '뉴스 검색에 실패했습니다.');
     updateNewsStatusTag(tavilyAvailable, false);
   } finally {
     setNewsLoading(false);
@@ -245,7 +247,7 @@ async function initNews() {
   setupNewsSearch();
 
   try {
-    const health = await TavilyAPI.health();
+    const health = await getTavilyAPI().health();
     tavilyAvailable = health.tavilyConfigured;
     updateNewsStatusTag(tavilyAvailable, false);
 
@@ -256,10 +258,10 @@ async function initNews() {
       renderFallbackNews();
       showNewsError('TAVILY_API_KEY 미설정 — .env 파일을 확인하세요. (샘플 데이터 표시 중)', false);
     }
-  } catch {
+  } catch (err) {
     tavilyAvailable = false;
     renderFallbackNews();
-    showNewsError('서버에 연결할 수 없습니다. python server/app.py 로 서버를 실행하세요.', false);
+    showNewsError(err.message || 'API 서버에 연결할 수 없습니다.', false);
     updateNewsStatusTag(false, false);
   }
 }
