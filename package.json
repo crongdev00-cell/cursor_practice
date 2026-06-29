@@ -5,7 +5,9 @@
   "description": "방산 동향 대시보드 + Tavily 검색 프록시",
   "scripts": {
     "start": "node server/index.js",
-    "dev": "node --watch server/index.js"
+    "dev": "node --watch server/index.js",
+    "dev:python": "python server/app.py",
+    "dev:vercel": "vercel dev"
   },
   "engines": {
     "node": ">=18.0.0"

@@ -20,7 +20,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 TAVILY_SEARCH_URL = "https://api.tavily.com/search"
-BLOCKED_PREFIXES = ("/.env", "/server/", "/node_modules/", "/.git/")
+BLOCKED_PREFIXES = ("/.env", "/server/", "/node_modules/", "/.git/", "/lib/", "/api/")
 MAX_BODY_BYTES = 32 * 1024
 
 
@@ -77,7 +77,7 @@ class DashboardHandler(SimpleHTTPRequestHandler):
         if self.path.startswith("/api/health"):
             self.end_json(
                 HTTPStatus.OK,
-                {"status": "ok", "tavilyConfigured": bool(TAVILY_API_KEY)},
+                {"status": "ok", "tavilyConfigured": bool(TAVILY_API_KEY), "runtime": "python"},
             )
             return
 
